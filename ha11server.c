@@ -8,7 +8,6 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
-
 #include <sys/types.h>
 
 #define maxConnections 2
@@ -178,10 +177,7 @@ void *f_thread(int *arg)
 
 char *pipe_read(void)
 {
-    /*// Destructing  pipe
-    int unlink(const char * myfifo);
-    */
-
+    int fd = -1;
     char buffer[16];
 
     // Creating the named file(FIFO) (named pipe)
@@ -190,35 +186,49 @@ char *pipe_read(void)
 
     // Open FIFO for Read only
     fd = open(myfifo, O_RDONLY);
+    if(fd == -1)
+    {
+        printf("\n ### ERRO AO CRIAR PIPE WRITE ###\n");
+        return 1;
+    }
 
     // Read from FIFO
     read(fd, arr1, sizeof(buffer));
+
+    // Destructing  pipe
+    int unlink(const char * myfifo);
 
     // Print the read message
     printf("Menssagem recebida pelo pipe_read: %s\n", buffer);
     close(fd);
 
     return buffer;
-}
+}T
 
 void pipe_write(char *buffer)
 {
-        // Destructing  pipe
-        int unlink(const char * myfifo);
+    int fd = -1;
 
-        // Creating the named file(FIFO) (named pipe)
-        // mkfifo(<pathname>, <permission>)
-        mkfifo(myfifo, 0666);
+    // Destructing  pipe
+    int unlink(const char * myfifo);
 
-        // Open FIFO for write only
-        fd = open(myfifo, O_WRONLY);
+    // Creating the named file(FIFO) (named pipe)
+    // mkfifo(<pathname>, <permission>)
+    mkfifo(myfifo, 0666);
 
-        // Write the input arr2ing on FIFO
-        // and close it
-        write(fd, buffer, strlen(buffer)+1);
-        close(fd);
+    // Open FIFO for write only
+    fd = open(myfifo, O_WRONLY);
+    if(fd == -1)
+    {
+        printf("\n ### ERRO AO CRIAR PIPE WRITE ###\n");
+        return 1;
+    }
+    // Write the input arr2ing on FIFO
+    // and close it
+    write(fd, buffer, strlen(buffer)+1);
+    close(fd);
 
-        // Print the read message
-        printf("Mennsagem enviada pelo pipe_write: %s\n", arr1);
-        close(fd);
+    // Print the read message
+    printf("Mennsagem enviada pelo pipe_write: %s\n", buffer);
+    close(fd);
 }
