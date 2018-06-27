@@ -6,6 +6,11 @@
 #include <netinet/in.h>
 #include <pthread.h>
 
+#include <fcntl.h>
+#include <sys/stat.h>
+
+#include <sys/types.h>
+
 #define maxConnections 2
 
 void *f_thread(int*);
@@ -33,9 +38,7 @@ int main(int argc , char *argv[])
             printf("Erro ao criar thread.");
             exit(-1);
         }
-
     }
-
 
     for(i=0; i<maxConnections;i++)
     {
@@ -95,6 +98,7 @@ void *f_thread(int *arg)
     char buffer[256];
     char string[4096];
     struct sockaddr_in client;
+    pid_t   childpid;
 
     printf("New thread. TID = %d!\n",(int) pthread_self());
 
@@ -109,6 +113,35 @@ void *f_thread(int *arg)
         exit(-1);
     }
     printf("Connection accepted\n");
+
+    /**/
+
+    if((childpid = fork()) == -1)
+    {
+        perror("fork");
+        exit(1);
+    }
+
+    if(childpid == 0)
+    {
+        /* Child process closes up input side of pipe */
+        close(fd[0]);
+
+        /* Send "string" through the output side of pipe */
+        write(fd[1], string, (strlen(string)+1));
+        exit(0);
+    }
+    else
+    {
+        /* Parent process closes up output side of pipe */
+        close(fd[1]);
+
+        /* Read in a string from the pipe */
+        nbytes = read(fd[0], readbuffer, sizeof(readbuffer));
+        printf("Received string: %s", readbuffer);
+    }
+
+    /**/
 
     while(1)
     {
@@ -141,4 +174,51 @@ void *f_thread(int *arg)
     close(new_socket);
     pthread_exit(0);
 
+}
+
+char *pipe_read(void)
+{
+    /*// Destructing  pipe
+    int unlink(const char * myfifo);
+    */
+
+    char buffer[16];
+
+    // Creating the named file(FIFO) (named pipe)
+    // mkfifo(<pathname>, <permission>)
+    mkfifo(myfifo, 0666);
+
+    // Open FIFO for Read only
+    fd = open(myfifo, O_RDONLY);
+
+    // Read from FIFO
+    read(fd, arr1, sizeof(buffer));
+
+    // Print the read message
+    printf("Menssagem recebida pelo pipe_read: %s\n", buffer);
+    close(fd);
+
+    return buffer;
+}
+
+void pipe_write(char *buffer)
+{
+        // Destructing  pipe
+        int unlink(const char * myfifo);
+
+        // Creating the named file(FIFO) (named pipe)
+        // mkfifo(<pathname>, <permission>)
+        mkfifo(myfifo, 0666);
+
+        // Open FIFO for write only
+        fd = open(myfifo, O_WRONLY);
+
+        // Write the input arr2ing on FIFO
+        // and close it
+        write(fd, buffer, strlen(buffer)+1);
+        close(fd);
+
+        // Print the read message
+        printf("Mennsagem enviada pelo pipe_write: %s\n", arr1);
+        close(fd);
 }

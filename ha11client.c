@@ -87,11 +87,7 @@ int main(int argc , char *argv[])
 void menu_descr(char *buffer)
 {
     printf("\n\n\n ######### funcoes suportadas ############");
-    printf("\n listar               -> 'ls -la', 'ls' ");
-    printf("\n criar diretorio      -> 'mkdir arg'         onde 'arg' e o nome ou caminho completodo diretorio novo desejado");
-    printf("\n criar arquivo        -> 'touch arg'         onde 'arga e o nome do arquivo desejedo");
-    printf("\n copiar               -> 'cp arg0 arg1'      onde 'arg0' e o arquivo de origem, 'arg1' arquivo de destino ou camiho do diretorio");
-    printf("\n remover arq ou pasta -> 'rm arg, rm -r arg' onde 'arg' e o nome do arquivo ou pasta a ser removido");
+    printf("\n criar arquivo        -> 'touch arg0 arg1'         onde 'arg0 e o nome do arquivo desejedo, arg1 é o seu conteudo conteudo");
     printf("\n sair                 -> 'exit'");
     printf("\n ->>");
     fgets(buffer,255,stdin);
