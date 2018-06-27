@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h> 
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -10,14 +10,13 @@
 
 void *f_thread(int*);
 int create_socket(void);
-char *check_command(char *, char *);
 
 //Declarações Mutex
 pthread_mutex_t mWrite;
 pthread_mutex_t mRemove;
 
 pthread_t aThreads[maxConnections];
- 
+
 int main(int argc , char *argv[])
 {
     int i, status, base_socket;
@@ -28,20 +27,20 @@ int main(int argc , char *argv[])
     for (i=0; i < maxConnections; i++)
     {
         status = pthread_create(&aThreads[i],0,f_thread,(void *)base_socket);
-        
+
         if(status != 0)
         {
             printf("Erro ao criar thread.");
             exit(-1);
         }
-        
+
     }
-    
+
 
     for(i=0; i<maxConnections;i++)
     {
         pthread_join(aThreads[i],0);
-    } 
+    }
 
     exit(0);
 }
@@ -64,14 +63,14 @@ int create_socket()
         exit(-1);
     }
     printf("Socket created\n");
-    
+
     bzero((char *) &server, sizeof (server));
 
     //Prepare the sockaddr_in structure
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons(portn);
-     
+
     //Bind
     if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
     {
@@ -96,9 +95,9 @@ void *f_thread(int *arg)
     char buffer[256];
     char string[4096];
     struct sockaddr_in client;
-    
+
     printf("New thread. TID = %d!\n",(int) pthread_self());
-     
+
     //Accept incoming connection
     printf("Waiting for incoming connections...\n");
     c = sizeof(struct sockaddr_in);
@@ -110,7 +109,7 @@ void *f_thread(int *arg)
         exit(-1);
     }
     printf("Connection accepted\n");
-    
+
     while(1)
     {
         char *checker = NULL;
@@ -123,7 +122,7 @@ void *f_thread(int *arg)
         close(base_sd);
         exit(-1);
         }
-        
+
         checker = strstr(buffer, "exit");
         if(checker == buffer)
         {
@@ -131,11 +130,9 @@ void *f_thread(int *arg)
             write(new_socket,"Connection Closed",2048);
             break;
         }
-        
-        *string = *check_command(buffer, string);
 
         if (write(new_socket,string,2048) < 0)
-        { 
+        {
         perror("ERROR writing to socket");
         close(base_sd);
         exit(-1);
@@ -143,108 +140,5 @@ void *f_thread(int *arg)
     }
     close(new_socket);
     pthread_exit(0);
-    
- }
 
- char* check_command(char *buffer, char *string)
- {
-     char *checker = NULL;
-
-    checker = strstr(buffer, "ls");
-    if(checker == buffer)
-    {
-        FILE *fp;
-        char path[60];
-                
-        //system(buffer);
-        fp = popen(buffer, "r");
-        strcpy(string,"\n");
-        while (fgets(path, 60, fp) != NULL)
-        {
-            strcat(string,path);
-        }
-        pclose(fp);
-        printf("Here is the message: %s",buffer);
-    }
-    checker = strstr(buffer, "mkdir");
-    if(checker == buffer)
-    {
-        FILE *fp;
-        char path[60];
-        
-        pthread_mutex_lock(&mWrite);
-
-        //sleep(20);
-        //system(buffer);
-        fp = popen(buffer, "r");
-        strcpy(string,"\n");
-        while (fgets(path, 60, fp) != NULL)
-        {
-            strcat(string,path);
-        }
-        pclose(fp);
-        pthread_mutex_unlock(&mWrite);
-        printf("Here is the message: %s",buffer);
-        strcpy(string,"Folder created succefully!");
-    }
-    
-    checker = strstr(buffer, "touch");
-    if(checker == buffer)
-    {
-        FILE *fp;
-        char path[60];
-        
-        pthread_mutex_lock(&mWrite);
-        //system(buffer);
-        fp = popen(buffer, "r");
-        strcpy(string,"\n");
-        while (fgets(path, 60, fp) != NULL)
-        {
-            strcat(string,path);
-        }
-        pclose(fp);
-        pthread_mutex_unlock(&mWrite);
-        printf("Here is the message: %s",buffer);
-        strcpy(string,"File created succefully!");
-    }
-
-    checker = strstr(buffer, "cp");
-    if(checker == buffer)
-    {
-        FILE *fp;
-        char path[60];
-        
-        //system(buffer);
-        fp = popen(buffer, "r");
-        strcpy(string,"\n");
-        while (fgets(path, 60, fp) != NULL)
-        {
-            strcat(string,path);
-        }
-        pclose(fp);
-        printf("Here is the message: %s",buffer);
-        strcpy(string,"Copy succesful!");
-    }
-
-    checker = strstr(buffer, "rm");
-    if(checker == buffer)
-    {
-        FILE *fp;
-        char path[60];
-        
-        pthread_mutex_lock(&mRemove);
-        //system(buffer);
-        fp = popen(buffer, "r");
-        strcpy(string,"\n");
-        while (fgets(path, 60, fp) != NULL)
-        {
-            strcat(string,path);
-        }
-        pclose(fp);
-        pthread_mutex_unlock(&mRemove);
-        printf("Here is the message: %s",buffer);
-        strcpy(string,"You removed the file!");
-    }
-
-    return string;
- }
+}
