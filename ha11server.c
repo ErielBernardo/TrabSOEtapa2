@@ -11,7 +11,7 @@
 #include <sys/types.h>
 
 #define maxConnections 1
-#define sizeBUFFER 16
+#define sizeBUFFER 256
 
 struct inode
 {
@@ -57,7 +57,6 @@ int main(int argc, char *argv[])
     mkfifo(myfifo, 0666);
 
     char buffer[sizeBUFFER];
-    char *checker = NULL;
 
     int i, status, base_socket;
     pthread_mutex_init(&mWrite,0);
@@ -72,15 +71,17 @@ int main(int argc, char *argv[])
     }
     if(childpid == 0) // Child process takes care of reading and wirting on disk
     {
+        pFile = create_filesystem();
+        printf("File system has been created\n");
+        int fd;
+        char string[sizeBUFFER];
         while(1)
         {
-            char string[sizeBUFFER];
+            char *checker = NULL;
             bzero(buffer,sizeBUFFER);
             bzero(string,sizeBUFFER);
-            pFile = create_filesystem();
-            printf("File system has been created\n");
 
-            int fd = -1;
+            fd = -1;
             // Open FIFO for Read only
             fd = open(myfifo, O_RDONLY);
             if(fd == -1)
@@ -95,13 +96,18 @@ int main(int argc, char *argv[])
                 break;
             }
 
-            /*check_command(buffer); /* MAKE COMMAND */
+            checker = strstr(buffer, "exit");
+            if(checker == buffer)
+            {
+                break;
+            }
 
-            close(fd);
+            /*check_command(buffer); /* MAKE COMMAND */
 
             printf("ainda estou em child no fim do while\n");
         }
-        printf("FIM de CHILD PROCESS\n");
+        printf("*** FIM de CHILD PROCESS ****\n");
+        close(fd);
         exit(0);
     }
 
@@ -123,7 +129,7 @@ int main(int argc, char *argv[])
         pthread_join(aThreads[i],0);
     }
 
-    printf("FIM de PARENT PROCESS\n");
+    printf("*** FIM de PARENT PROCESS ***\n");
     exit(0);
 }
 
@@ -192,11 +198,13 @@ void *f_thread(int *arg)
     }
     printf("Connection accepted\n");
 
+    int fd;
     while(1)
     {
         // FIFO file path
         char * myfifo = "/tmp/myfifo";
-        int fd = -1;
+
+        fd = -1;
 
         char *checker = NULL;
         bzero(buffer, sizeBUFFER);
@@ -211,14 +219,6 @@ void *f_thread(int *arg)
         }
         printf("\n\n\nMensagem recebida do client: %s\n", buffer);
 
-        checker = strstr(buffer, "exit");
-        if(checker == buffer)
-        {
-            printf("Connection with this thread ended!\n");
-            write(new_socket, "Connection Closed", 256);
-            break;
-        }
-
         // Open FIFO for write only
         fd = open(myfifo, O_WRONLY);
         if(fd == -1)
@@ -227,13 +227,21 @@ void *f_thread(int *arg)
             break;
         }
 
-        // Write the input buffer on FIFO and close it
+        // Write the input buffer on FIFO
         if((write(fd, buffer, sizeBUFFER)) < 0)
         {
             perror("FIFO write error");
             break;
         }
-        close(fd);
+
+        checker = strstr(buffer, "exit");
+        if(checker == buffer)
+        {
+            printf("Connection with this thread ended!\n");
+            write(new_socket, "Connection Closed", 17);
+            break;
+        }
+
         printf("ANIDA estou em PARENT - DEPOIS de 'pipe_write(buffer);'\n");
 
         if (write(new_socket, "Retorno", 7) < 0)
@@ -244,6 +252,7 @@ void *f_thread(int *arg)
         }
     }
     close(new_socket);
+    close(fd);
     pthread_exit(0);
 }
 

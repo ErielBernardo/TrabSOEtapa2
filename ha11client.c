@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#define sizeBUFFER 16
+#define sizeBUFFER 256
 
 void menu_descr(char *buffer);
 
