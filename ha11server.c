@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define maxConnections 2
+#define maxConnections 1
 #define sizeBUFFER 16
 
 void *f_thread(int*);
@@ -19,6 +19,8 @@ int create_socket(void);
 //Pipes control functions
 char *pipe_read(void);
 void pipe_write(char *buffer);
+void pipe_create(void);
+void pipe_destroyer(void);
 
 //Declarações Mutex
 pthread_mutex_t mWrite;
@@ -28,6 +30,53 @@ pthread_t aThreads[maxConnections];
 
 int main(int argc , char *argv[])
 {
+    pipe_create();
+
+    char *checker = NULL;
+    pid_t   childpid; // PID of the child process of fork
+    char buffer[sizeBUFFER];
+
+    // Creating fork
+    if((childpid = fork()) == -1)
+    {
+        perror("fork");
+        exit(1);
+    }
+
+    if(childpid = 0) // Child process takes care of reading and wirting on disk
+    {
+        printf(" estou no inicio de child\n");
+
+        while(1)
+        {
+            bzero(buffer,sizeBUFFER);
+            printf(" estou em child antes de pipe_read()\n");
+            strcpy(buffer, pipe_read());
+
+            checker = strstr(buffer, "exit");
+            if(checker == buffer)
+            {
+                printf("Child process ended!\n");
+                break;
+            }
+
+            /* INSERIR
+             * PARTE
+             * DA
+             * ESCRITA
+             * EM
+             * DISCO
+             */
+
+            printf("ainda estou em child no fim do while\n");
+        }
+        pipe_destroyer();
+        exit(0);
+    }
+
+    // Parent process takes care of communication with client
+    //pipe_write("TESTE PIPE");
+
     int i, status, base_socket;
     pthread_mutex_init(&mWrite,0);
     pthread_mutex_init(&mRemove,0);
@@ -43,11 +92,14 @@ int main(int argc , char *argv[])
         }
     }
 
+    printf("ANIDA estou em PARENT\n - Finalizando threads e pipe\n");
+    pipe_destroyer();
     for(i=0; i<maxConnections;i++)
     {
         pthread_join(aThreads[i],0);
     }
 
+    printf("FIM de PARENT\n");
     exit(0);
 }
 
@@ -96,13 +148,11 @@ int create_socket()
 
 void *f_thread(int *arg)
 {
-    char *checker = NULL;
     int base_sd = (int) arg;
     int i,c, new_socket;
-    char buffer[256];
+    char buffer[sizeBUFFER];
     char string[4096];
     struct sockaddr_in client;
-    pid_t   childpid; // PID of the child process of fork
 
     printf("New thread. TID = %d!\n",(int) pthread_self());
 
@@ -118,54 +168,24 @@ void *f_thread(int *arg)
     }
     printf("Connection accepted\n");
 
-    // Creating the fork
-    if((childpid = fork()) == -1)
-    {
-        perror("fork");
-        exit(1);
-    }
-
-    if(childpid == 0) // Child process takes care of reading and wirting on disk
-    {
-        while(1)
-        {
-            bzero(buffer,256);
-            strcpy(buffer, pipe_read());
-
-            checker = strstr(buffer, "exit");
-            if(checker == buffer)
-            {
-                printf("Child process ended!\n");
-                break;
-            }
-
-            /* INSERIR
-             * PARTE
-             * DA
-             * ESCRITA
-             * EM
-             * DISCO */
-        }
-        exit(0);
-    }
-    else // Parent process takes care of communication with client
-    {
-        pipe_write("TESTE PIPE_WRITE");
-    }
-
-    /**/
-
     while(1)
     {
-        bzero(buffer,256);
-        bzero(string,2048);
+        char *checker = NULL;
+        bzero(buffer,sizeBUFFER);
+
         //Read the message from socket
-        if (read(new_socket,buffer,255) < 0)
+        if (read(new_socket,buffer,sizeBUFFER-1) < 0)
         {
-        perror("ERROR reading from socket");
-        close(base_sd);
-        exit(-1);
+            perror("ERROR reading from socket");
+            close(base_sd);
+            exit(-1);
         }
+
+        printf("\nMensagem recebida do client: %s\n", buffer);
+
+        printf("ANIDA estou em PARENT - ANTES de 'pipe_write(buffer);'\n");
+        pipe_write(buffer);
+        printf("ANIDA estou em PARENT - DEPOIS de 'pipe_write(buffer);'\n");
 
         checker = strstr(buffer, "exit");
         if(checker == buffer)
@@ -175,16 +195,16 @@ void *f_thread(int *arg)
             break;
         }
 
-        if (write(new_socket,string,2048) < 0)
+        if (write(new_socket,"Retorno",2048) < 0)
         {
-        perror("ERROR writing to socket");
-        close(base_sd);
-        exit(-1);
+            perror("ERROR writing to socket");
+            close(base_sd);
+            exit(-1);
         }
     }
+
     close(new_socket);
     pthread_exit(0);
-
 }
 
 char *pipe_read(void)
@@ -195,20 +215,20 @@ char *pipe_read(void)
     // FIFO file path
     char * myfifo = "/tmp/myfifo";
 
-    // Creating the named file(FIFO) (named pipe)
-    // mkfifo(<pathname>, <permission>)
-    mkfifo(myfifo, 0666);
-
     // Open FIFO for Read only
     fd = open(myfifo, O_RDONLY);
     if(fd == -1)
     {
-        printf("\n ### ERRO AO CRIAR PIPE READ ###\n");
+        perror("FIFO read error");
         return NULL;
     }
 
     // Read from FIFO and close it
-    read(fd, buffer, sizeof(buffer));
+    if((read(fd, buffer, sizeBUFFER)) < 0)
+    {
+        perror("FIFO read error");
+        return;
+    }
     close(fd);
 
     // Print the read message
@@ -219,32 +239,50 @@ char *pipe_read(void)
 
 void pipe_write(char *buffer)
 {
+    printf("\n Em pipe_write()\n   buffer = %s\n", buffer);
     int fd = -1;
 
     // FIFO file path
     char * myfifo = "/tmp/myfifo";
 
-    // Remove FIFO
-    int unlink(const char * myfifo);
-
-    // Creating the named file(FIFO) (named pipe)
-    // mkfifo(<pathname>, <permission>)
-    mkfifo(myfifo, 0666);
-
     // Open FIFO for write only
     fd = open(myfifo, O_WRONLY);
     if(fd == -1)
     {
-        printf("\n ### ERRO AO CRIAR PIPE WRITE ###\n");
-        return NULL;
+        perror("FIFO write error");
+        return;
     }
 
     // Write the input buffer on FIFO and close it
-    write(fd, buffer, strlen(buffer)+1);
+    if((write(fd, buffer, sizeBUFFER)) < 0)
+    {
+        perror("FIFO write error");
+        return;
+    }
     close(fd);
 
     // Print the write message
-    printf("Mennsagem enviada pelo pipe_write: %s\n", buffer);
+    printf("Mennsagem ENVIADA pelo pipe_write: %s\n", buffer);
 
     return;
+}
+
+
+void pipe_create(void)
+{
+    // FIFO file path
+    char * myfifo = "/tmp/myfifo";
+
+    // Creating the named file(FIFO) (named pipe)
+    // mkfifo(<pathname>, <permission>)
+    mkfifo(myfifo, 0666);
+}
+
+void pipe_destroyer(void)
+{
+    // FIFO file path
+    char * myfifo = "/tmp/myfifo";
+
+    // Remove FIFO
+    int unlink(const char * myfifo);
 }
