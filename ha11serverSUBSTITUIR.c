@@ -196,7 +196,7 @@ void *f_thread(int *arg)
   meta.fsSize = 1024;
   meta.pContent = 400;
   meta.pInodes = 24;
-  meta.blockSize = 8;
+  meta.blockSize = 1;
   meta.freeSpace = 624;
 
   FILE * pFile;
@@ -219,9 +219,11 @@ void *f_thread(int *arg)
 
     //strcpy(newNode.name,"teste.txt");
     strcpy(newNode.name,filename);
-    newNode.size = sizeof(contenti);
+    newNode.size = (int) strlen(contenti);
     newNode.cTime = time(NULL);
     newNode.pBlocs = meta.fsSize - meta.freeSpace;
+
+    printf("%lu\n",sizeof(contenti));
 
     meta.freeSpace = meta.freeSpace - ceil(newNode.size);
 
@@ -231,5 +233,5 @@ void *f_thread(int *arg)
     meta.pInodes = meta.pInodes + sizeof(newNode);
 
     fseek ( pFile , newNode.pBlocs, SEEK_SET );
-    fwrite (&contenti, sizeof(contenti), 1, pFile);
+    fwrite (&contenti, strlen(contenti), 1, pFile);
  }
