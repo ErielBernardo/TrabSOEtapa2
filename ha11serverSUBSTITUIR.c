@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h> 
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -42,34 +42,32 @@ pthread_mutex_t mRemove;
 FILE* pFile;
 
 pthread_t aThreads[maxConnections];
- 
-int main(int argc , char *argv[])
+
+int main(int argc, char *argv[])
 {
     int i, status, base_socket;
     pthread_mutex_init(&mWrite,0);
     pthread_mutex_init(&mRemove,0);
 
     pFile = create_filesystem();
-    
+
     base_socket = create_socket();
     for (i=0; i < maxConnections; i++)
     {
         status = pthread_create(&aThreads[i],0,f_thread,(void *)base_socket);
-        
+
         if(status != 0)
         {
             printf("Error: Thread could not be created.");
             exit(-1);
         }
-        
     }
-    
 
-    for(i=0; i<maxConnections;i++)
+    for(i=0; i<maxConnections; i++)
     {
         pthread_join(aThreads[i],0);
-    } 
-    
+    }
+
     fclose(pFile);
     exit(0);
 }
@@ -79,29 +77,29 @@ int create_socket()
     int i;
 
     //Declarações socket
-    int socket_desc , new_socket , c, portn;
-    struct sockaddr_in server , client;
+    int socket_desc, new_socket, c, portn;
+    struct sockaddr_in server, client;
     char buffer[256];
     portn = 9000;
 
     //Create socket
-    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    socket_desc = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_desc == -1)
     {
         perror("Could not create socket\n");
         exit(-1);
     }
     printf("Socket created\n");
-    
+
     bzero((char *) &server, sizeof (server));
 
     //Prepare the sockaddr_in structure
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons(portn);
-     
+
     //Bind
-    if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
+    if( bind(socket_desc,(struct sockaddr *)&server, sizeof(server)) < 0)
     {
         perror("Bind failed");
         close(socket_desc);
@@ -110,7 +108,7 @@ int create_socket()
     printf("Bind done\n");
 
     //Listen
-    listen(socket_desc , maxConnections);
+    listen(socket_desc, maxConnections);
 
     printf("Socket created and listening...\n");
 
@@ -124,9 +122,9 @@ void *f_thread(int *arg)
     char buffer[256];
     char string[4096];
     struct sockaddr_in client;
-    
+
     printf("New thread. TID = %d!\n",(int) pthread_self());
-     
+
     //Accept incoming connection
     printf("Waiting for incoming connections...\n");
     c = sizeof(struct sockaddr_in);
@@ -138,7 +136,7 @@ void *f_thread(int *arg)
         exit(-1);
     }
     printf("Connection accepted\n");
-    
+
     while(1)
     {
         char *checker = NULL;
@@ -147,11 +145,11 @@ void *f_thread(int *arg)
         //Read the message from socket
         if (read(new_socket,buffer,255) < 0)
         {
-        perror("ERROR reading from socket");
-        close(base_sd);
-        exit(-1);
+            perror("ERROR reading from socket");
+            close(base_sd);
+            exit(-1);
         }
-        
+
         checker = strstr(buffer, "exit");
         if(checker == buffer)
         {
@@ -159,57 +157,57 @@ void *f_thread(int *arg)
             write(new_socket,"Connection Closed",2048);
             break;
         }
-        
+
         check_command(buffer, string);
 
         if (write(new_socket,string,2048) < 0)
-        { 
-        perror("ERROR writing to socket");
-        close(base_sd);
-        exit(-1);
+        {
+            perror("ERROR writing to socket");
+            close(base_sd);
+            exit(-1);
         }
     }
     close(new_socket);
     pthread_exit(0);
-    
- }
 
- void check_command(char *buffer, char *string)
- {
+}
+
+void check_command(char *buffer, char *string)
+{
     char *aux;
     char fname[20];
     char content[32];
 
     aux = strtok (buffer," ");
     strcpy(fname, aux);
-    
+
 
     aux = strtok (NULL," ");
     strcpy(content, aux);
 
     create_file(pFile,content,fname);
- }
+}
 
- FILE* create_filesystem()
- {
+FILE* create_filesystem()
+{
 
-  meta.fsSize = 1024;
-  meta.pContent = 400;
-  meta.pInodes = 24;
-  meta.blockSize = 1;
-  meta.freeSpace = 624;
+    meta.fsSize = 1024;
+    meta.pContent = 400;
+    meta.pInodes = 24;
+    meta.blockSize = 1;
+    meta.freeSpace = 624;
 
-  FILE * pFile;
-  pFile = fopen ("myfile.bin","wb");
-  if (pFile!=NULL)
-  {
-    fwrite(&meta, sizeof(struct metadata), 1, pFile);
-  }
-  return pFile;
- }
+    FILE * pFile;
+    pFile = fopen ("myfile.bin","wb");
+    if (pFile!=NULL)
+    {
+        fwrite(&meta, sizeof(struct metadata), 1, pFile);
+    }
+    return pFile;
+}
 
- void create_file(FILE* pFile, char* content, char* filename)
- {
+void create_file(FILE* pFile, char* content, char* filename)
+{
     struct inode newNode;
 
     printf("%s\n",content);
@@ -227,11 +225,11 @@ void *f_thread(int *arg)
 
     meta.freeSpace = meta.freeSpace - ceil(newNode.size);
 
-    fseek ( pFile , meta.pInodes, SEEK_SET );
+    fseek ( pFile, meta.pInodes, SEEK_SET );
     fwrite (&newNode, sizeof(newNode), 1, pFile);
 
     meta.pInodes = meta.pInodes + sizeof(newNode);
 
-    fseek ( pFile , newNode.pBlocs, SEEK_SET );
+    fseek ( pFile, newNode.pBlocs, SEEK_SET );
     fwrite (&contenti, strlen(contenti), 1, pFile);
- }
+}
