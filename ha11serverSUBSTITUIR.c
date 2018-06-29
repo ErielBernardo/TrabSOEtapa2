@@ -9,7 +9,7 @@
 #include <time.h>
 #include <math.h>
 
-#define maxConnections 1
+#define maxConnections 2
 
 struct inode
 {
@@ -214,15 +214,16 @@ void *f_thread(int *arg)
 
     printf("%s\n",content);
     printf("%s\n",filename);
-    char contenti[32] = "Conteudo de Teste";
+    char contenti[32];
+    strcpy(contenti,content);
 
     //strcpy(newNode.name,"teste.txt");
     strcpy(newNode.name,filename);
-    newNode.size = sizeof(content);
+    newNode.size = sizeof(contenti);
     newNode.cTime = time(NULL);
     newNode.pBlocs = meta.fsSize - meta.freeSpace;
 
-    meta.freeSpace = meta.freeSpace - ceil(newNode.size/8);
+    meta.freeSpace = meta.freeSpace - ceil(newNode.size);
 
     fseek ( pFile , meta.pInodes, SEEK_SET );
     fwrite (&newNode, sizeof(newNode), 1, pFile);
