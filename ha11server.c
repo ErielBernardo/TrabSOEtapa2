@@ -17,10 +17,8 @@ void *f_thread(int*);
 int create_socket(void);
 
 //Pipes control functions
-char *pipe_read(void);
-void pipe_write(char *buffer);
-void pipe_create(void);
-void pipe_destroyer(void);
+//char *pipe_read(void);
+//void pipe_write(char *buffer);
 
 //Declarações Mutex
 pthread_mutex_t mWrite;
@@ -30,35 +28,50 @@ pthread_t aThreads[maxConnections];
 
 int main(int argc , char *argv[])
 {
-    pipe_create();
-
-    char *checker = NULL;
-    pid_t   childpid; // PID of the child process of fork
     char buffer[sizeBUFFER];
 
+    // FIFO file path
+    char * myfifo = "/tmp/myfifo";
+
+    // Remove FIFO
+    int unlink(const char * myfifo);
+
+    // Creating the named file(FIFO) (named pipe)
+    // mkfifo(<pathname>, <permission>)
+    mkfifo(myfifo, 0666);
+
+    char *checker = NULL;
+
+    pid_t   childpid; // PID of the child process of fork
     // Creating fork
     if((childpid = fork()) == -1)
     {
         perror("fork");
         exit(1);
     }
-
-    if(childpid = 0) // Child process takes care of reading and wirting on disk
+    if(childpid == 0) // Child process takes care of reading and wirting on disk
     {
-        printf(" estou no inicio de child\n");
-
         while(1)
         {
             bzero(buffer,sizeBUFFER);
             printf(" estou em child antes de pipe_read()\n");
-            strcpy(buffer, pipe_read());
+            //strcpy(buffer, pipe_read());
 
-            checker = strstr(buffer, "exit");
-            if(checker == buffer)
+            int fd = -1;
+            // Open FIFO for Read only
+            fd = open(myfifo, O_RDONLY);
+            if(fd == -1)
             {
-                printf("Child process ended!\n");
+                perror("FIFO read error");
                 break;
             }
+            // Read from FIFO and close it
+            if((read(fd, buffer, sizeBUFFER)) < 0)
+            {
+                perror("FIFO read error");
+                break;
+            }
+            close(fd);
 
             /* INSERIR
              * PARTE
@@ -70,7 +83,6 @@ int main(int argc , char *argv[])
 
             printf("ainda estou em child no fim do while\n");
         }
-        pipe_destroyer();
         exit(0);
     }
 
@@ -92,14 +104,12 @@ int main(int argc , char *argv[])
         }
     }
 
-    printf("ANIDA estou em PARENT\n - Finalizando threads e pipe\n");
-    pipe_destroyer();
     for(i=0; i<maxConnections;i++)
     {
         pthread_join(aThreads[i],0);
     }
 
-    printf("FIM de PARENT\n");
+    printf("FIM de PARENT PROCESS\n");
     exit(0);
 }
 
@@ -170,6 +180,10 @@ void *f_thread(int *arg)
 
     while(1)
     {
+        // FIFO file path
+        char * myfifo = "/tmp/myfifo";
+        int fd = -1;
+
         char *checker = NULL;
         bzero(buffer,sizeBUFFER);
 
@@ -180,11 +194,26 @@ void *f_thread(int *arg)
             close(base_sd);
             exit(-1);
         }
-
         printf("\nMensagem recebida do client: %s\n", buffer);
 
-        printf("ANIDA estou em PARENT - ANTES de 'pipe_write(buffer);'\n");
-        pipe_write(buffer);
+        //printf("ANIDA estou em PARENT - ANTES de 'pipe_write(buffer);'\n");
+        //pipe_write(buffer);
+
+        // Open FIFO for write only
+        fd = open(myfifo, O_WRONLY);
+        if(fd == -1)
+        {
+            perror("FIFO write error");
+            break;
+        }
+
+        // Write the input buffer on FIFO and close it
+        if((write(fd, buffer, sizeBUFFER)) < 0)
+        {
+            perror("FIFO write error");
+            break;
+        }
+        close(fd);
         printf("ANIDA estou em PARENT - DEPOIS de 'pipe_write(buffer);'\n");
 
         checker = strstr(buffer, "exit");
@@ -206,7 +235,7 @@ void *f_thread(int *arg)
     close(new_socket);
     pthread_exit(0);
 }
-
+/*
 char *pipe_read(void)
 {
     int fd = -1;
@@ -266,23 +295,4 @@ void pipe_write(char *buffer)
 
     return;
 }
-
-
-void pipe_create(void)
-{
-    // FIFO file path
-    char * myfifo = "/tmp/myfifo";
-
-    // Creating the named file(FIFO) (named pipe)
-    // mkfifo(<pathname>, <permission>)
-    mkfifo(myfifo, 0666);
-}
-
-void pipe_destroyer(void)
-{
-    // FIFO file path
-    char * myfifo = "/tmp/myfifo";
-
-    // Remove FIFO
-    int unlink(const char * myfifo);
-}
+*/
