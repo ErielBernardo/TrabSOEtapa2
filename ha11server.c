@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <math.h>
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -41,7 +42,6 @@ void create_file(FILE* pFile, char* content, char* filename);
 
 //Declarações Mutex
 pthread_mutex_t mWrite;
-pthread_mutex_t mRemove;
 FILE* pFile;
 
 pthread_t aThreads[maxConnections];
@@ -63,7 +63,6 @@ int main(int argc, char *argv[])
 
     int i, status, base_socket;
     pthread_mutex_init(&mWrite,0);
-    pthread_mutex_init(&mRemove,0);
 
     pid_t   childpid; // PID of the child process of fork
     // Creating fork
@@ -103,21 +102,23 @@ int main(int argc, char *argv[])
             checker = strstr(buffer, "exit");
             if(checker == buffer)
             {
-                break;
+                //break;
             }
+            printf("\n\n mensagem recebida pelo filesystem =  %s", buffer);
+
             check_command(buffer); /* MAKE COMMAND */
 
             /* RETURN OF COMMAND */
             ffsFIFO = -1;
             // Open FIFO for Read only
             ffsFIFO = open(fsFIFO, O_WRONLY);
-            if(fsvFIFO == -1)
+            if(ffsFIFO == -1)
             {
                 perror("FIFO write error");
                 break;
             }
-            // Read from FIFO and close it
-            if((write(fsvFIFO, "Command has been done successfully", sizeBUFFER)) < 0)
+            // Write from FIFO
+            if((write(ffsFIFO, "Command has been done successfully", 40) < 0))
             {
                 perror("FIFO write error");
                 break;
@@ -315,7 +316,7 @@ FILE* create_filesystem()
     meta.fsSize = 1024;
     meta.pContent = 400;
     meta.pInodes = 24;
-    meta.blockSize = 8;
+    meta.blockSize = 1;
     meta.freeSpace = 624;
 
     FILE * pFile;
@@ -338,11 +339,15 @@ void create_file(FILE* pFile, char* content, char* filename)
 
     //strcpy(newNode.name,"teste.txt");
     strcpy(newNode.name,filename);
-    newNode.size = sizeof(contenti);
+    newNode.size = (int) strlen(contenti);
     newNode.cTime = time(NULL);
     newNode.pBlocs = meta.fsSize - meta.freeSpace;
 
+    printf("%lu\n",sizeof(contenti));
+
     meta.freeSpace = meta.freeSpace - ceil(newNode.size);
+
+    pthread_mutex_lock(&mWrite);
 
     fseek ( pFile, meta.pInodes, SEEK_SET );
     fwrite (&newNode, sizeof(newNode), 1, pFile);
@@ -350,5 +355,9 @@ void create_file(FILE* pFile, char* content, char* filename)
     meta.pInodes = meta.pInodes + sizeof(newNode);
 
     fseek ( pFile, newNode.pBlocs, SEEK_SET );
-    fwrite (&contenti, sizeof(contenti), 1, pFile);
+    fwrite (&contenti, strlen(contenti), 1, pFile);
+
+    fseek ( pFile, 0, SEEK_SET );
+    fwrite(&meta, sizeof(struct metadata), 1, pFile);
+    pthread_mutex_unlock(&mWrite);
 }

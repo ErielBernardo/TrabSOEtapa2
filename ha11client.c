@@ -88,7 +88,8 @@ int main(int argc , char *argv[])
 void menu_descr(char *buffer)
 {
     printf("\n\n ######### COMANDOS ############");
-    printf("\n  Para sair         -> 'exit'");
+    printf("\n  Para sair           -> 'exit'");
+    printf("\n  Para criar arquivo  -> 'arg0' 'arg1'    |   onde 'arg0' é o nome do arquivo e 'arg1' é o conteudo  ");
     printf("\n  --->>");
     fgets(buffer,sizeBUFFER,stdin);
     printf("\n\n");
