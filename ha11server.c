@@ -13,34 +13,55 @@
 #define maxConnections 1
 #define sizeBUFFER 16
 
+struct inode
+{
+    char name[20];
+    int size;
+    time_t cTime;
+    int pBlocs;
+};
+
+struct metadata
+{
+    int fsSize;
+    int pContent;
+    int pInodes;
+    int blockSize;
+    int freeSpace;
+};
+
+struct metadata meta;
+
+
 void *f_thread(int*);
 int create_socket(void);
-
-//Pipes control functions
-//char *pipe_read(void);
-//void pipe_write(char *buffer);
+void check_command(char *);
+FILE* create_filesystem(void);
+void create_file(FILE* pFile, char* content, char* filename);
 
 //Declarações Mutex
 pthread_mutex_t mWrite;
 pthread_mutex_t mRemove;
+FILE* pFile;
 
 pthread_t aThreads[maxConnections];
 
-int main(int argc , char *argv[])
+int main(int argc, char *argv[])
 {
-    char buffer[sizeBUFFER];
-
     // FIFO file path
     char * myfifo = "/tmp/myfifo";
-
     // Remove FIFO
     int unlink(const char * myfifo);
-
     // Creating the named file(FIFO) (named pipe)
     // mkfifo(<pathname>, <permission>)
     mkfifo(myfifo, 0666);
 
+    char buffer[sizeBUFFER];
     char *checker = NULL;
+
+    int i, status, base_socket;
+    pthread_mutex_init(&mWrite,0);
+    pthread_mutex_init(&mRemove,0);
 
     pid_t   childpid; // PID of the child process of fork
     // Creating fork
@@ -53,9 +74,11 @@ int main(int argc , char *argv[])
     {
         while(1)
         {
+            char string[sizeBUFFER];
             bzero(buffer,sizeBUFFER);
-            printf(" estou em child antes de pipe_read()\n");
-            //strcpy(buffer, pipe_read());
+            bzero(string,sizeBUFFER);
+            pFile = create_filesystem();
+            printf("File system has been created\n");
 
             int fd = -1;
             // Open FIFO for Read only
@@ -71,27 +94,18 @@ int main(int argc , char *argv[])
                 perror("FIFO read error");
                 break;
             }
-            close(fd);
 
-            /* INSERIR
-             * PARTE
-             * DA
-             * ESCRITA
-             * EM
-             * DISCO
-             */
+            /*check_command(buffer); /* MAKE COMMAND */
+
+            close(fd);
 
             printf("ainda estou em child no fim do while\n");
         }
+        printf("FIM de CHILD PROCESS\n");
         exit(0);
     }
 
     // Parent process takes care of communication with client
-    //pipe_write("TESTE PIPE");
-
-    int i, status, base_socket;
-    pthread_mutex_init(&mWrite,0);
-    pthread_mutex_init(&mRemove,0);
 
     base_socket = create_socket();
     for (i=0; i < maxConnections; i++)
@@ -104,7 +118,7 @@ int main(int argc , char *argv[])
         }
     }
 
-    for(i=0; i<maxConnections;i++)
+    for(i=0; i<maxConnections; i++)
     {
         pthread_join(aThreads[i],0);
     }
@@ -118,13 +132,13 @@ int create_socket()
     int i;
 
     //Declarações socket
-    int socket_desc , new_socket , c, portn;
-    struct sockaddr_in server , client;
+    int socket_desc, new_socket, c, portn;
+    struct sockaddr_in server, client;
     char buffer[256];
     portn = 9000;
 
     //Create socket
-    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    socket_desc = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_desc == -1)
     {
         perror("Could not create socket\n");
@@ -140,7 +154,7 @@ int create_socket()
     server.sin_port = htons(portn);
 
     //Bind
-    if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
+    if( bind(socket_desc,(struct sockaddr *)&server, sizeof(server)) < 0)
     {
         perror("Bind failed");
         close(socket_desc);
@@ -149,7 +163,7 @@ int create_socket()
     printf("Bind done\n");
 
     //Listen
-    listen(socket_desc , maxConnections);
+    listen(socket_desc, maxConnections);
 
     printf("Socket created and listening...\n");
 
@@ -161,7 +175,7 @@ void *f_thread(int *arg)
     int base_sd = (int) arg;
     int i,c, new_socket;
     char buffer[sizeBUFFER];
-    char string[4096];
+    char string[sizeBUFFER];
     struct sockaddr_in client;
 
     printf("New thread. TID = %d!\n",(int) pthread_self());
@@ -185,19 +199,25 @@ void *f_thread(int *arg)
         int fd = -1;
 
         char *checker = NULL;
-        bzero(buffer,sizeBUFFER);
+        bzero(buffer, sizeBUFFER);
+        bzero(string, sizeBUFFER);
 
         //Read the message from socket
-        if (read(new_socket,buffer,sizeBUFFER-1) < 0)
+        if (read(new_socket,buffer,sizeBUFFER) < 0)
         {
             perror("ERROR reading from socket");
             close(base_sd);
             exit(-1);
         }
-        printf("\nMensagem recebida do client: %s\n", buffer);
+        printf("\n\n\nMensagem recebida do client: %s\n", buffer);
 
-        //printf("ANIDA estou em PARENT - ANTES de 'pipe_write(buffer);'\n");
-        //pipe_write(buffer);
+        checker = strstr(buffer, "exit");
+        if(checker == buffer)
+        {
+            printf("Connection with this thread ended!\n");
+            write(new_socket, "Connection Closed", 256);
+            break;
+        }
 
         // Open FIFO for write only
         fd = open(myfifo, O_WRONLY);
@@ -216,83 +236,73 @@ void *f_thread(int *arg)
         close(fd);
         printf("ANIDA estou em PARENT - DEPOIS de 'pipe_write(buffer);'\n");
 
-        checker = strstr(buffer, "exit");
-        if(checker == buffer)
-        {
-            printf("Connection with this thread ended!\n");
-            write(new_socket,"Connection Closed",2048);
-            break;
-        }
-
-        if (write(new_socket,"Retorno",2048) < 0)
+        if (write(new_socket, "Retorno", 7) < 0)
         {
             perror("ERROR writing to socket");
             close(base_sd);
             exit(-1);
         }
     }
-
     close(new_socket);
     pthread_exit(0);
 }
-/*
-char *pipe_read(void)
+
+void check_command(char *buffer)
 {
-    int fd = -1;
-    char buffer[sizeBUFFER];
+    char *aux;
+    char fname[20];
+    char content[32];
 
-    // FIFO file path
-    char * myfifo = "/tmp/myfifo";
+    aux = strtok (buffer," ");
+    strcpy(fname, aux);
 
-    // Open FIFO for Read only
-    fd = open(myfifo, O_RDONLY);
-    if(fd == -1)
-    {
-        perror("FIFO read error");
-        return NULL;
-    }
 
-    // Read from FIFO and close it
-    if((read(fd, buffer, sizeBUFFER)) < 0)
-    {
-        perror("FIFO read error");
-        return;
-    }
-    close(fd);
+    aux = strtok (NULL," ");
+    strcpy(content, aux);
 
-    // Print the read message
-    printf("Menssagem recebida pelo pipe_read: %s\n", buffer);
-
-    return buffer;
+    create_file(pFile,content,fname);
 }
 
-void pipe_write(char *buffer)
+FILE* create_filesystem()
 {
-    printf("\n Em pipe_write()\n   buffer = %s\n", buffer);
-    int fd = -1;
 
-    // FIFO file path
-    char * myfifo = "/tmp/myfifo";
+    meta.fsSize = 1024;
+    meta.pContent = 400;
+    meta.pInodes = 24;
+    meta.blockSize = 8;
+    meta.freeSpace = 624;
 
-    // Open FIFO for write only
-    fd = open(myfifo, O_WRONLY);
-    if(fd == -1)
+    FILE * pFile;
+    pFile = fopen ("myfile.bin","wb");
+    if (pFile!=NULL)
     {
-        perror("FIFO write error");
-        return;
+        fwrite(&meta, sizeof(struct metadata), 1, pFile);
     }
-
-    // Write the input buffer on FIFO and close it
-    if((write(fd, buffer, sizeBUFFER)) < 0)
-    {
-        perror("FIFO write error");
-        return;
-    }
-    close(fd);
-
-    // Print the write message
-    printf("Mennsagem ENVIADA pelo pipe_write: %s\n", buffer);
-
-    return;
+    return pFile;
 }
-*/
+
+void create_file(FILE* pFile, char* content, char* filename)
+{
+    struct inode newNode;
+
+    printf("%s\n",content);
+    printf("%s\n",filename);
+    char contenti[32];
+    strcpy(contenti,content);
+
+    //strcpy(newNode.name,"teste.txt");
+    strcpy(newNode.name,filename);
+    newNode.size = sizeof(contenti);
+    newNode.cTime = time(NULL);
+    newNode.pBlocs = meta.fsSize - meta.freeSpace;
+
+    meta.freeSpace = meta.freeSpace - ceil(newNode.size);
+
+    fseek ( pFile, meta.pInodes, SEEK_SET );
+    fwrite (&newNode, sizeof(newNode), 1, pFile);
+
+    meta.pInodes = meta.pInodes + sizeof(newNode);
+
+    fseek ( pFile, newNode.pBlocs, SEEK_SET );
+    fwrite (&contenti, sizeof(contenti), 1, pFile);
+}
