@@ -49,12 +49,15 @@ pthread_t aThreads[maxConnections];
 int main(int argc, char *argv[])
 {
     // FIFO file path
-    char * myfifo = "/tmp/myfifo";
+    char * fsFIFO = "/tmp/fsFIFO";
+    char * svFIFO = "/tmp/svFIFO";
     // Remove FIFO
-    int unlink(const char * myfifo);
+    int unlink(const char * fsFIFO);
+    int unlink(const char * svFIFO);
     // Creating the named file(FIFO) (named pipe)
     // mkfifo(<pathname>, <permission>)
-    mkfifo(myfifo, 0666);
+    mkfifo(fsFIFO, 0666);
+    mkfifo(svFIFO, 0666);
 
     char buffer[sizeBUFFER];
 
@@ -69,11 +72,12 @@ int main(int argc, char *argv[])
         perror("fork");
         exit(1);
     }
-    if(childpid == 0) // Child process takes care of reading and wirting on disk
+    if(childpid == 0) // Child process takes care of reading and writing on disk
     {
         pFile = create_filesystem();
         printf("File system has been created\n");
-        int fd;
+        int fsvFIFO;
+        int ffsFIFO;
         char string[sizeBUFFER];
         while(1)
         {
@@ -81,16 +85,16 @@ int main(int argc, char *argv[])
             bzero(buffer,sizeBUFFER);
             bzero(string,sizeBUFFER);
 
-            fd = -1;
+            fsvFIFO = -1;
             // Open FIFO for Read only
-            fd = open(myfifo, O_RDONLY);
-            if(fd == -1)
+            fsvFIFO = open(svFIFO, O_RDONLY);
+            if(fsvFIFO == -1)
             {
                 perror("FIFO read error");
                 break;
             }
             // Read from FIFO and close it
-            if((read(fd, buffer, sizeBUFFER)) < 0)
+            if((read(fsvFIFO, buffer, sizeBUFFER)) < 0)
             {
                 perror("FIFO read error");
                 break;
@@ -101,13 +105,28 @@ int main(int argc, char *argv[])
             {
                 break;
             }
+            check_command(buffer); /* MAKE COMMAND */
 
-            /*check_command(buffer); /* MAKE COMMAND */
-
-            printf("ainda estou em child no fim do while\n");
+            /* RETURN OF COMMAND */
+            ffsFIFO = -1;
+            // Open FIFO for Read only
+            ffsFIFO = open(fsFIFO, O_WRONLY);
+            if(fsvFIFO == -1)
+            {
+                perror("FIFO write error");
+                break;
+            }
+            // Read from FIFO and close it
+            if((write(fsvFIFO, "Command has been done successfully", sizeBUFFER)) < 0)
+            {
+                perror("FIFO write error");
+                break;
+            }
+            printf("Ainda estou em child no fim do while\n");
         }
         printf("*** FIM de CHILD PROCESS ****\n");
-        close(fd);
+        close(fsvFIFO);
+        close(ffsFIFO);
         exit(0);
     }
 
@@ -198,13 +217,14 @@ void *f_thread(int *arg)
     }
     printf("Connection accepted\n");
 
-    int fd;
+    int fsvFIFO;
+    int ffsFIFO;
     while(1)
     {
         // FIFO file path
-        char * myfifo = "/tmp/myfifo";
+        char * svFIFO = "/tmp/svFIFO";
 
-        fd = -1;
+        fsvFIFO = -1;
 
         char *checker = NULL;
         bzero(buffer, sizeBUFFER);
@@ -220,15 +240,14 @@ void *f_thread(int *arg)
         printf("\n\n\nMensagem recebida do client: %s\n", buffer);
 
         // Open FIFO for write only
-        fd = open(myfifo, O_WRONLY);
-        if(fd == -1)
+        fsvFIFO = open(svFIFO, O_WRONLY);
+        if(fsvFIFO == -1)
         {
             perror("FIFO write error");
             break;
         }
-
         // Write the input buffer on FIFO
-        if((write(fd, buffer, sizeBUFFER)) < 0)
+        if((write(fsvFIFO, buffer, sizeBUFFER)) < 0)
         {
             perror("FIFO write error");
             break;
@@ -242,9 +261,27 @@ void *f_thread(int *arg)
             break;
         }
 
+        /* READING RETURN MESSAGE */
+        // FIFO file path
+        char * fsFIFO = "/tmp/fsFIFO";
+        ffsFIFO = -1;
+        // Open FIFO for Read only
+        ffsFIFO = open(fsFIFO, O_RDONLY);
+        if(ffsFIFO == -1)
+        {
+            perror("FIFO read error");
+            break;
+        }
+        // Read from FIFO and close it
+        if((read(ffsFIFO, string, sizeBUFFER)) < 0)
+        {
+            perror("FIFO read error");
+            break;
+        }
+
         printf("ANIDA estou em PARENT - DEPOIS de 'pipe_write(buffer);'\n");
 
-        if (write(new_socket, "Retorno", 7) < 0)
+        if (write(new_socket, string, sizeBUFFER) < 0)
         {
             perror("ERROR writing to socket");
             close(base_sd);
@@ -252,7 +289,7 @@ void *f_thread(int *arg)
         }
     }
     close(new_socket);
-    close(fd);
+    close(fsvFIFO);
     pthread_exit(0);
 }
 
