@@ -11,6 +11,7 @@
 #include <sys/types.h>
 
 #define maxConnections 2
+#define sizeBUFFER 16
 
 void *f_thread(int*);
 int create_socket(void);
@@ -95,6 +96,7 @@ int create_socket()
 
 void *f_thread(int *arg)
 {
+    char *checker = NULL;
     int base_sd = (int) arg;
     int i,c, new_socket;
     char buffer[256];
@@ -123,30 +125,38 @@ void *f_thread(int *arg)
         exit(1);
     }
 
-    if(childpid == 0)
+    if(childpid == 0) // Child process takes care of reading and wirting on disk
     {
-        /* Child process closes up input side of pipe
-        close(fd[0]);*/
+        while(1)
+        {
+            bzero(buffer,256);
+            strcpy(buffer, pipe_read());
 
-        /* Send "string" through the output side of pipe
-        write(fd[1], string, (strlen(string)+1));
-        exit(0);*/
+            checker = strstr(buffer, "exit");
+            if(checker == buffer)
+            {
+                printf("Child process ended!\n");
+                break;
+            }
+
+            /* INSERIR
+             * PARTE
+             * DA
+             * ESCRITA
+             * EM
+             * DISCO */
+        }
+        exit(0);
     }
-    else
+    else // Parent process takes care of communication with client
     {
-        /* Parent process closes up output side of pipe
-        close(fd[1]);*/
-
-        /* Read in a string from the pipe
-        nbytes = read(fd[0], readbuffer, sizeof(readbuffer));
-        printf("Received string: %s", readbuffer);*/
+        pipe_write("TESTE PIPE_WRITE");
     }
 
     /**/
 
     while(1)
     {
-        char *checker = NULL;
         bzero(buffer,256);
         bzero(string,2048);
         //Read the message from socket
@@ -180,7 +190,7 @@ void *f_thread(int *arg)
 char *pipe_read(void)
 {
     int fd = -1;
-    char buffer[16];
+    char buffer[sizeBUFFER];
 
     // FIFO file path
     char * myfifo = "/tmp/myfifo";
@@ -236,4 +246,5 @@ void pipe_write(char *buffer)
     // Print the write message
     printf("Mennsagem enviada pelo pipe_write: %s\n", buffer);
 
+    return;
 }
