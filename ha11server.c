@@ -15,6 +15,10 @@
 void *f_thread(int*);
 int create_socket(void);
 
+//Pipes control functions
+char *pipe_read(void);
+void pipe_write(char *buffer);
+
 //Declarações Mutex
 pthread_mutex_t mWrite;
 pthread_mutex_t mRemove;
@@ -31,7 +35,6 @@ int main(int argc , char *argv[])
     for (i=0; i < maxConnections; i++)
     {
         status = pthread_create(&aThreads[i],0,f_thread,(void *)base_socket);
-
         if(status != 0)
         {
             printf("Erro ao criar thread.");
@@ -97,7 +100,7 @@ void *f_thread(int *arg)
     char buffer[256];
     char string[4096];
     struct sockaddr_in client;
-    pid_t   childpid;
+    pid_t   childpid; // PID of the child process of fork
 
     printf("New thread. TID = %d!\n",(int) pthread_self());
 
@@ -113,8 +116,7 @@ void *f_thread(int *arg)
     }
     printf("Connection accepted\n");
 
-    /**/
-
+    // Creating the fork
     if((childpid = fork()) == -1)
     {
         perror("fork");
@@ -123,21 +125,21 @@ void *f_thread(int *arg)
 
     if(childpid == 0)
     {
-        /* Child process closes up input side of pipe */
-        close(fd[0]);
+        /* Child process closes up input side of pipe
+        close(fd[0]);*/
 
-        /* Send "string" through the output side of pipe */
+        /* Send "string" through the output side of pipe
         write(fd[1], string, (strlen(string)+1));
-        exit(0);
+        exit(0);*/
     }
     else
     {
-        /* Parent process closes up output side of pipe */
-        close(fd[1]);
+        /* Parent process closes up output side of pipe
+        close(fd[1]);*/
 
-        /* Read in a string from the pipe */
+        /* Read in a string from the pipe
         nbytes = read(fd[0], readbuffer, sizeof(readbuffer));
-        printf("Received string: %s", readbuffer);
+        printf("Received string: %s", readbuffer);*/
     }
 
     /**/
@@ -180,6 +182,9 @@ char *pipe_read(void)
     int fd = -1;
     char buffer[16];
 
+    // FIFO file path
+    char * myfifo = "/tmp/myfifo";
+
     // Creating the named file(FIFO) (named pipe)
     // mkfifo(<pathname>, <permission>)
     mkfifo(myfifo, 0666);
@@ -188,28 +193,28 @@ char *pipe_read(void)
     fd = open(myfifo, O_RDONLY);
     if(fd == -1)
     {
-        printf("\n ### ERRO AO CRIAR PIPE WRITE ###\n");
-        return 1;
+        printf("\n ### ERRO AO CRIAR PIPE READ ###\n");
+        return NULL;
     }
 
-    // Read from FIFO
-    read(fd, arr1, sizeof(buffer));
-
-    // Destructing  pipe
-    int unlink(const char * myfifo);
+    // Read from FIFO and close it
+    read(fd, buffer, sizeof(buffer));
+    close(fd);
 
     // Print the read message
     printf("Menssagem recebida pelo pipe_read: %s\n", buffer);
-    close(fd);
 
     return buffer;
-}T
+}
 
 void pipe_write(char *buffer)
 {
     int fd = -1;
 
-    // Destructing  pipe
+    // FIFO file path
+    char * myfifo = "/tmp/myfifo";
+
+    // Remove FIFO
     int unlink(const char * myfifo);
 
     // Creating the named file(FIFO) (named pipe)
@@ -221,14 +226,14 @@ void pipe_write(char *buffer)
     if(fd == -1)
     {
         printf("\n ### ERRO AO CRIAR PIPE WRITE ###\n");
-        return 1;
+        return NULL;
     }
-    // Write the input arr2ing on FIFO
-    // and close it
+
+    // Write the input buffer on FIFO and close it
     write(fd, buffer, strlen(buffer)+1);
     close(fd);
 
-    // Print the read message
+    // Print the write message
     printf("Mennsagem enviada pelo pipe_write: %s\n", buffer);
-    close(fd);
+
 }
