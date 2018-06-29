@@ -7,13 +7,15 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#define sizeBUFFER 16
+
 void menu_descr(char *buffer);
 
 int main(int argc , char *argv[])
 {
     struct sockaddr_in serv_addr;
     struct hostent *server;
-    char buffer[4096];
+    char buffer[sizeBUFFER];
     int socket_desc, portn;
     char *checker = NULL;
 
@@ -49,13 +51,12 @@ int main(int argc , char *argv[])
     while(1)
     {
         char *checker = NULL;
-        //Send some msg
-        /*printf("Write a message: ");
-        fgets(buffer,255,stdin);*/
-        strcpy(buffer, "");
-        menu_descr(buffer);
 
-        if( send(socket_desc , buffer , 255 , 0) < 0)
+        bzero(buffer, sizeBUFFER);
+        //menu_descr(buffer);
+        fgets(buffer,sizeBUFFER,stdin);
+
+        if( send(socket_desc , buffer , sizeBUFFER , 0) < 0)
         {
             perror("Send failed");
             close(socket_desc);
@@ -63,8 +64,8 @@ int main(int argc , char *argv[])
         }
 
         //Receive reply
-        bzero(buffer,4096);
-        if( recv(socket_desc, buffer , 4095 , 0) < 0)
+        bzero(buffer, sizeBUFFER);
+        if( recv(socket_desc, buffer , sizeBUFFER , 0) < 0)
         {
             perror("Receive failed");
             close(socket_desc);
@@ -86,10 +87,9 @@ int main(int argc , char *argv[])
 
 void menu_descr(char *buffer)
 {
-    printf("\n\n\n ######### funcoes suportadas ############");
-    printf("\n criar arquivo        -> 'touch arg0 arg1'         onde 'arg0 e o nome do arquivo desejedo, arg1 é o seu conteudo conteudo");
-    printf("\n sair                 -> 'exit'");
-    printf("\n ->>");
-    fgets(buffer,255,stdin);
+    printf("\n\n ######### COMANDOS ############");
+    printf("\n  Para sair         -> 'exit'");
+    printf("\n  --->>");
+    fgets(buffer,sizeBUFFER,stdin);
     printf("\n\n");
 }
